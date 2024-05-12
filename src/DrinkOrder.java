@@ -7,7 +7,7 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
-public class DrinkOrder  {
+public class DrinkOrder implements Comparable<DrinkOrder> {
     private long arrivalTime;
     //DO NOT change the code below
     public enum Drink { 
@@ -54,15 +54,14 @@ public class DrinkOrder  {
 
  //constructor
     public DrinkOrder(int patron) {
-        this.arrivalTime = System.currentTimeMillis();
     	drink=getRandomDrink();
     	orderComplete = new AtomicBoolean(false);
     	orderer=patron;
     }
     public long getArrivalTime() {
         return arrivalTime;
-
     }
+
 
     public static Drink getRandomDrink() {
         Drink[] drinks = Drink.values();  // Get all enum constants
@@ -91,5 +90,11 @@ public class DrinkOrder  {
     @Override
     public String toString() {
         return Integer.toString(orderer) +": "+ drink.getName();
+    }
+    
+    @Override
+    public int compareTo(DrinkOrder other) {
+        // Compare DrinkOrders based on their execution time
+        return Integer.compare(this.getExecutionTime(), other.getExecutionTime());
     }
 }
