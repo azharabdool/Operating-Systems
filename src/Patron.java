@@ -21,25 +21,22 @@ public class Patron extends Thread {
 	private int ID; //thread ID 
 	private int lengthOfOrder;
 	private long startTime, endTime; //for all the metrics
-	
-	public static FileWriter fileW;
+	private long firstResponseTime; // time from order placed to order received
+
+	//public FileWriter fileW;
 
 
-	private DrinkOrder [] drinksOrder;
 	
-	Patron( int ID,  CountDownLatch startSignal, Barman aBarman) {
+	Patron(int ID, CountDownLatch startSignal, Barman aBarman) {
 		this.ID=ID;
 		this.startSignal=startSignal;
 		this.theBarman=aBarman;
+		
 		this.lengthOfOrder=random.nextInt(5)+1;//between 1 and 5 drinks
-		drinksOrder=new DrinkOrder[lengthOfOrder];
+		//this.fileW = fileW;
 	}
 	
-	public  void writeToFile(String data) throws IOException {
-	    synchronized (fileW) {
-	    	fileW.write(data);
-	    }
-	}
+	
 	
 	
 
@@ -54,45 +51,57 @@ public class Patron extends Thread {
 			//END do not change
 			
 	        //create drinks order
-	        for(int i=0;i<lengthOfOrder;i++) {
+	        DrinkOrder[] drinksOrder = new DrinkOrder[lengthOfOrder];
+			for(int i=0;i<lengthOfOrder;i++) {
 	        	drinksOrder[i]=new DrinkOrder(this.ID);
 	        	
 	        }
 			System.out.println("Patron "+ this.ID + " submitting order of " + lengthOfOrder +" drinks"); //output in standard format  - do not change this
 	        
-
+			startTime = System.currentTimeMillis();// started placing orders
 			//need to get response time
-			long responseTime = System.currentTimeMillis() - startTime;
-
-
-			startTime = System.currentTimeMillis();//started placing orders
-			for(int i=0;i<lengthOfOrder;i++) {
-				System.out.println("Order placed by " + drinksOrder[i].toString());
-				theBarman.placeDrinkOrder(drinksOrder[i]);
-			}
-			for(int i=0;i<lengthOfOrder;i++) {
-				drinksOrder[i].waitForOrder();
-			}
-
-			endTime = System.currentTimeMillis();
-			long totalTime = endTime - startTime;
-
-			//now need turnaround time and waiting time
-			long turnaroundTime = endTime - arrivalTime;
-			long waitingTime = turnaroundTime - totalTime;
-
-			writeToFile(String.format("turnaround_time,%d,%d\n", ID, turnaroundTime));
-            writeToFile(String.format("waiting_time,%d,%d\n", ID, waitingTime));
-			//writeToFile( String.format("%d,%d,%d\n",ID,arrivalTime,totalTime));
-			System.out.println("Patron "+ this.ID + " got order in " + totalTime);
 			
+			for (DrinkOrder order : drinksOrder) {
+                System.out.println("Order placed by " + order.toString());
+                theBarman.placeDrinkOrder(order);
+            }
+			for (DrinkOrder order : drinksOrder) {
+                order.waitForOrder();
+                if (order.equals(drinksOrder[0])) {
+                    firstResponseTime = System.currentTimeMillis();
+                }
+            }
+			
+			endTime = System.currentTimeMillis();
+            long totalTime = endTime - startTime;
+            long responseTime = firstResponseTime - startTime;
+            long waitingTime = totalTime - orderProcessingTime(drinksOrder);
+
+			//synchronized (fileW) {
+            //    fileW.write(String.format("%d,%d,%d,%d,%d,%d\n", ID, arrivalTime, totalTime, lengthOfOrder, responseTime, waitingTime));
+            //}
+			
+			//writeToFile( String.format("%d,%d,%d\n",ID,arrivalTime,totalTime));
+			System.out.println("Patron " + this.ID + " got order in " + totalTime + "ms");
+            System.out.println("Patron " + this.ID + " got first drink after " + (responseTime + "ms of waiting"));
+            System.out.println("Patron " + this.ID + " waited for " + waitingTime + "ms");
+
 			
 		} catch (InterruptedException e1) {  //do nothing
-		} catch (IOException e) {
+		} //catch (IOException e) {
 			//  Auto-generated catch block
-			e.printStackTrace();
-		}
-}
+			//e.printStackTrace();
+		//}
+
+	}
+	// Helper method to calculate the total processing time for all orders
+    private long orderProcessingTime(DrinkOrder[] orders) {
+        long totalProcessingTime = 0;
+        for (DrinkOrder order : orders) {
+            totalProcessingTime += order.getExecutionTime();
+        }
+        return totalProcessingTime;
+    }
 }
 	
 

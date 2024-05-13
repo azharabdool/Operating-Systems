@@ -24,83 +24,70 @@ public class Barman extends Thread {
     private FileWriter responseTimeWriter;
     private FileWriter turnaroundTimeWriter;
     private FileWriter waitingTimeWriter;
-
+    private int ordersCompleted;
+    private long totalTurnaroundTime;
+    private long totalWaitingTime;
+    private long totalResponseTime;
+    private long startTime;
 	
 	public Barman(  CountDownLatch startSignal,int schedAlg) {
 		if (schedAlg==0)
-			this.orderQueue = new PriorityBlockingQueue<>();
+		this.orderQueue = new LinkedBlockingQueue<>();
 		//FIX below
 		else
             this.orderQueue = new PriorityBlockingQueue<>(); // Placeholder for other scheduling algorithms
 		this.startSignal = startSignal;
-        
-		try {
-			responseTimeWriter = new FileWriter("response_time.txt");
-			turnaroundTimeWriter = new FileWriter("turnaround_time.txt");
-			waitingTimeWriter = new FileWriter("waiting_time.txt");
-			System.out.println("FileWriters initialized successfully.");
-
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		this.ordersCompleted = 0;
+        this.totalTurnaroundTime = 0;
+        this.totalWaitingTime = 0;
+        this.totalResponseTime = 0;
+		
 	}	
+	
 	
 	public void placeDrinkOrder(DrinkOrder order) throws InterruptedException {
         orderQueue.put(order);
     }
 	
-	
+	public int getOrdersCompleted() {
+    	return ordersCompleted;
+	}
+
 	public void run() {
 		try {
 			DrinkOrder nextOrder;
 			
 			startSignal.countDown(); //barman ready
 			startSignal.await(); //check latch - don't start until told to do so
-
+			startTime = System.currentTimeMillis();
 			while(true) {
 				nextOrder=orderQueue.take();
-				long startTime = System.currentTimeMillis();
 				System.out.println("---Barman preparing order for patron "+ nextOrder.toString());
 				sleep(nextOrder.getExecutionTime()); //processing order
-				long endTime = System.currentTimeMillis();
 				System.out.println("---Barman has made order for patron "+ nextOrder.toString());
+				ordersCompleted++;
+
+				long endTime = System.currentTimeMillis();
+				totalTurnaroundTime += (endTime - nextOrder.getArrivalTime());
+                totalWaitingTime += (endTime - startTime - nextOrder.getExecutionTime());
+                totalResponseTime += (endTime - startTime);
+
 				nextOrder.orderDone();
 
-				long responseTime = startTime - nextOrder.getArrivalTime;
-            	long turnaroundTime = endTime - nextOrder.getArrivalTime;
-                long waitingTime = endTime - startTime;
-
-				try {
-                    System.out.println("Writing metrics to files...");
-                    responseTimeWriter.write(Long.toString(responseTime) + "\n");
-					responseTimeWriter.flush();
-
-					turnaroundTimeWriter.write(Long.toString(turnaroundTime) + "\n");
-                    turnaroundTimeWriter.flush();
-					waitingTimeWriter.write(Long.toString(waitingTime) + "\n");
-                    waitingTimeWriter.flush();
-					// Flush to ensure immediate writing
-                    
-                    
-                    
-                    System.out.println("Metrics written successfully.");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+				
 			}
 				
 		} catch (InterruptedException e1) {
 			System.out.println("---Barman is packing up ");
-		} finally {
-            // Close file writers
-            try {
-                responseTimeWriter.close();
-                turnaroundTimeWriter.close();
-                waitingTimeWriter.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+		}
+		// Calculate averages
+        double averageTurnaroundTime = (double) totalTurnaroundTime / ordersCompleted;
+        double averageWaitingTime = (double) totalWaitingTime / ordersCompleted;
+        double averageResponseTime = (double) totalResponseTime / ordersCompleted;
+		
+		System.out.println("Average Turnaround Time: " + averageTurnaroundTime + "ms");
+        System.out.println("Average Waiting Time: " + averageWaitingTime + "ms");
+        System.out.println("Average Response Time: " + averageResponseTime + "ms");
     }
 
 

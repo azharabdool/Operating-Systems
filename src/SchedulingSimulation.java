@@ -10,22 +10,17 @@ import java.util.concurrent.CountDownLatch;
 
 
 public class SchedulingSimulation {
-	static int noPatrons=100; //number of customers - default value if not provided on command line
-	static int sched=0; //which scheduling algorithm, 0= FCFS
+	static int noPatrons=10; //number of customers - default value if not provided on command line
+	static int sched=1; //which scheduling algorithm, 0= FCFS
 			
 	static CountDownLatch startSignal;
 
 	
 	static Patron[] patrons; // array for customer threads
 	static Barman Andre;
-	static FileWriter writer;
+	//static FileWriter writer;
 
-	public  void writeToFile(String data) throws IOException {
-	    synchronized (writer) {
-	    	writer.write(data);
-	    }
-	}
-
+	
 	public static void main(String[] args) throws InterruptedException, IOException {
 		
 		
@@ -38,15 +33,16 @@ public class SchedulingSimulation {
 			sched=Integer.parseInt(args[1]); 
 		}
 		
-		writer = new FileWriter("turnaround_time_"+Integer.toString(sched)+".txt", false);
-		Patron.fileW=writer;
+		//writer = new FileWriter("turnaround_time_"+Integer.toString(sched)+".txt", false);
+		//writer.write("Patron ID, Arrival Time, Turnaround Time, Length of Order, Response Time, Waiting Time\n");
 
 		startSignal= new CountDownLatch(noPatrons+2);//Barman and patrons and main method must be raeady
 		
 		//create barman
         Andre= new Barman(startSignal,sched); 
      	Andre.start();
-  
+		long startTime = System.currentTimeMillis(); // Start the timer
+
 	    //create all the patrons, who all need access to Andre
 		patrons = new Patron[noPatrons];
 		for (int i=0;i<noPatrons;i++) {
@@ -59,26 +55,13 @@ public class SchedulingSimulation {
 
       	startSignal.countDown(); //main method ready
       	
-		FileWriter responseWriter = new FileWriter("response_time_" + Integer.toString(sched) + ".txt", false);
-		FileWriter turnaroundWriter = new FileWriter("turnaround_time_" + Integer.toString(sched) + ".txt", false);
-		FileWriter waitingWriter = new FileWriter("waiting_time_" + Integer.toString(sched) + ".txt", false);
 		
-		responseWriter.write("PatronID,ResponseTime\n");
-        turnaroundWriter.write("PatronID,TurnaroundTime\n");
-        waitingWriter.write("PatronID,WaitingTime\n");
-
-		for (int i = 0; i < noPatrons; i++) {
-			patrons[i] = new Patron(i, startSignal, Andre);
-			patrons[i].start();
-		}
       	//wait till all patrons done, otherwise race condition on the file closing!
       	for (int i=0;i<noPatrons;i++) {
 			patrons[i].join();
 		}
 		
-		responseWriter.close();
-    	turnaroundWriter.close();
-    	waitingWriter.close();
+		int ordersCompleted = Andre.getOrdersCompleted();
     	
 		
 		
@@ -89,8 +72,11 @@ public class SchedulingSimulation {
 		
 		Andre.interrupt();   //tell Andre to close up
     	Andre.join(); //wait till he has
-      	writer.close(); //all done, can close file
-      	System.out.println("------Bar closed------");
+      	//.close(); //all done, can close file
+      	long endTime = System.currentTimeMillis(); // End the timer
+		double throughput = ordersCompleted / ((endTime - startTime) / 1000.0); // Calculate the throughput
+		System.out.println("Throughput: " + throughput + " orders per second");
+		System.out.println("------Bar closed------");
 	}
 
 }
